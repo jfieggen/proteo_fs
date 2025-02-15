@@ -61,7 +61,7 @@ __pycache__/
 *.py[cod]
 
 # Virtual environments
-ad4mm_venv/
+*_venv/
 .venv/
 env/
 .env/
