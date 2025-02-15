@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --partition=short
-#SBATCH --job-name=cox_lasso2
+#SBATCH --job-name=cox_lasso
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=10
 #SBATCH --mem-per-cpu=8G
 #SBATCH -A clifton.prj
-#SBATCH -o outputs/slurm_logs/cox_lasso2.out
-#SBATCH -e outputs/slurm_logs/cox_lasso2.err
+#SBATCH -o outputs/slurm_logs/cox_lasso.out
+#SBATCH -e outputs/slurm_logs/cox_lasso.err
 
 echo "------------------------------------------------" 
 echo "Run on host: $(hostname)"

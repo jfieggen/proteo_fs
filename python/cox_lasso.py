@@ -82,7 +82,7 @@ def Bootstrap_train_cox(X, y, seed, performance_CUTOFF, candidate_alphas, imputa
     final_pipeline = Pipeline([
         ('imputer', SimpleImputer(strategy=imputation_strategy)),
         ('scaler', StandardScaler()),
-        ('cox', CoxnetSurvivalAnalysis(l1_ratio=1.0, fit_baseline_model=True, max_iter=10000, alphas=np.array([best_alpha])))
+        ('cox', CoxnetSurvivalAnalysis(l1_ratio=1.0, fit_baseline_model=True, max_iter=20000, alphas=np.array([best_alpha])))
     ])
     final_pipeline.fit(X_boot, y_boot)
     
@@ -157,7 +157,7 @@ def Train_cox_lasso_bootstrap(n_bootstraps=500, performance_CUTOFF=0.95, imputat
     # -------------------------------------------------------------------
 
     # Now proceed with the LASSO bootstrap approach
-    candidate_alphas = np.logspace(-2, 0.1, 30)
+    candidate_alphas = np.logspace(-2.5, 0, 100)
     seeds = list(range(n_bootstraps))
     
     # Parallelize bootstrap iterations.
