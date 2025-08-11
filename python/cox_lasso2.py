@@ -64,8 +64,15 @@ def remove_low_variance_features(X, var_threshold=1e-10):
 def cox_concordance_scorer(estimator, X, y):
     """
     Computes the concordance index (C-index) for the Cox model.
+    If the estimated coefficients are all (or nearly) zero, return a very poor score.
     Note: We use the negative of the risk score because a higher risk implies lower survival time.
     """
+    # Access the underlying Cox model from the pipeline.
+    cox_model = estimator.named_steps["cox"]
+    # Penalize the all-zero solution
+    if np.all(np.abs(cox_model.coef_) < 1e-6):
+        return -999  # A very poor score to discourage selection of an all-zero model.
+    
     risk_scores = -estimator.predict(X)
     c_index = concordance_index_censored(y["outcome"], y["time"], risk_scores)[0]
     return c_index
@@ -179,29 +186,23 @@ def Train_cox_lasso_bootstrap(n_bootstraps=500, performance_CUTOFF=0.95, imputat
     # --- 1) Baseline (Almost Unpenalized) Cox Model for Sanity Check ---
     # Use lifelines' CoxPHFitter (similar to R's coxph) with a tiny ridge penalization.
     print("Training a baseline (almost unpenalized) Cox model using lifelines for sanity check...")
-
-    # Impute missing values
     imputer = SimpleImputer(strategy=imputation_strategy)
     X_imputed = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
-
-    # Standardize the features
     scaler = StandardScaler()
     X_scaled = pd.DataFrame(scaler.fit_transform(X_imputed), columns=X.columns)
-
-    # Create DataFrame for lifelines with survival columns
+    
+    # Create a DataFrame for lifelines that includes survival columns.
     df_for_lifelines = X_scaled.copy()
     df_for_lifelines["time"] = df_y["time"].values
     df_for_lifelines["event"] = df_y["outcome"].values
 
-    # Fit Cox model (Fix: use `max_iter` instead of `max_steps`)
-    cph = CoxPHFitter(penalizer=1e-5)  # Remove `max_steps`
-    cph.fit(df_for_lifelines, duration_col="time", event_col="event", show_progress=True, step_size=0.1, max_iter=500)
-
-    # Extract coefficients
+    # Use a tiny ridge penalizer (penalizer=1e-5) to improve numerical stability.
+    cph = CoxPHFitter(penalizer=1e-5, max_steps=500, tol=1e-7)
+    cph.fit(df_for_lifelines, duration_col="time", event_col="event", show_progress=True)
+    
+    # Extract coefficients and compute hazard ratios.
     coef_series = cph.params_.copy()
     hr_series = np.exp(coef_series)
-
-    # Sort coefficients by absolute value and extract top 20
     sorted_by_abs = coef_series.abs().sort_values(ascending=False)
     top20_features = sorted_by_abs.index[:20]
     df_general_cox_top20 = pd.DataFrame({
@@ -209,13 +210,11 @@ def Train_cox_lasso_bootstrap(n_bootstraps=500, performance_CUTOFF=0.95, imputat
         "coefficient": coef_series.loc[top20_features].values,
         "hazard_ratio": hr_series.loc[top20_features].values
     })
-
-    # Save results
     df_general_cox_top20.to_csv(GENERAL_COX_COEF_PATH, index=False)
     print(f"Saved top 20 general Cox model coefficients to: {GENERAL_COX_COEF_PATH}\n")
-
     
     # --- 2) Bootstrapped LASSO Cox Model ---
+    # Adjust candidate_alphas range if needed.
     candidate_alphas = np.logspace(-5, 0, 100)
     seeds = list(range(n_bootstraps))
     
